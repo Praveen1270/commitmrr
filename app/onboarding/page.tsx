@@ -32,7 +32,13 @@ type GithubConnection = {
 export default async function OnboardingPage({
   searchParams,
 }: {
-  searchParams: Promise<{ repo?: string; repoRequired?: string; slug?: string }>;
+  searchParams: Promise<{
+    githubImport?: string;
+    message?: string;
+    repo?: string;
+    repoRequired?: string;
+    slug?: string;
+  }>;
 }) {
   const params = await searchParams;
   const repoQuery = params.repo?.trim() ?? "";
@@ -64,6 +70,11 @@ export default async function OnboardingPage({
         <h1 className="mt-2 max-w-2xl font-mono text-4xl font-black tracking-[-0.055em]">
           Connect GitHub. Add your startup.
         </h1>
+        {params.githubImport === "failed" && (
+          <p className="mt-4 rounded-[10px] border border-red-200 bg-red-50 p-4 font-mono text-sm leading-6 text-red-700">
+            GitHub connected, but repository import failed: {params.message ?? "try refreshing repos."}
+          </p>
+        )}
         <div className="mt-8 grid gap-5 md:grid-cols-[1fr_1.1fr]">
           <section className="rounded-[14px] border border-zinc-200 bg-white p-6 shadow-sm">
             <GitBranch className="text-zinc-900" />

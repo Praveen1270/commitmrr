@@ -1,13 +1,9 @@
 "use server";
 
 import { encryptSecret } from "@/lib/security/crypto";
-import {
-  fetchDailyCommitCounts,
-  fetchGitHubRepositories,
-  fetchGitHubViewer,
-  type GitHubRepository,
-} from "@/lib/providers/github";
+import { fetchDailyCommitCounts, type GitHubRepository } from "@/lib/providers/github";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { importGitHubAccount } from "@/lib/sync/github-import";
 import { daysAgo, toDateKey } from "@/lib/utils";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
@@ -45,41 +41,11 @@ export async function importGitHubRepositories() {
   const token = sessionData.session?.provider_token || process.env.GITHUB_TOKEN;
   if (!token) throw new Error("GitHub token unavailable. Reconnect GitHub or set GITHUB_TOKEN locally.");
 
-  const [viewer, repositories] = await Promise.all([
-    fetchGitHubViewer(token),
-    fetchGitHubRepositories(token),
-  ]);
-
-  if (repositories.length) {
-    const { data: existingRepos, error: existingReposError } = await supabase
-      .from("github_repositories")
-      .select("github_id, is_tracked")
-      .eq("user_id", user.id);
-
-    if (existingReposError) throw existingReposError;
-
-    const trackedByGithubId = new Map(
-      ((existingRepos ?? []) as { github_id: number; is_tracked: boolean }[]).map((repo) => [
-        repo.github_id,
-        repo.is_tracked,
-      ]),
-    );
-
-    const { error } = await supabase.from("github_repositories").upsert(
-      repositories.map((repo) => ({
-        user_id: user.id,
-        github_id: repo.githubId,
-        owner: repo.owner,
-        name: repo.name,
-        full_name: repo.fullName,
-        html_url: repo.htmlUrl,
-        is_private: repo.private,
-        is_tracked: trackedByGithubId.get(repo.githubId) ?? false,
-      })),
-      { onConflict: "user_id,github_id" },
-    );
-    if (error) throw error;
-  }
+  const { repositories } = await importGitHubAccount({
+    supabase,
+    token,
+    userId: user.id,
+  });
 
   await syncCommitMetrics({
     supabase,
@@ -87,20 +53,6 @@ export async function importGitHubRepositories() {
     token,
     repositories,
   });
-
-  await supabase.from("provider_connections").upsert(
-    {
-      user_id: user.id,
-      provider: "github",
-      mode: "oauth",
-      external_account_id: viewer.login,
-      connected_at: new Date().toISOString(),
-      config: {
-        githubLogin: viewer.login,
-      },
-    },
-    { onConflict: "user_id,provider" },
-  );
 
   revalidatePath("/onboarding");
 }
