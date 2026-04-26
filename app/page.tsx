@@ -1,4 +1,5 @@
 import { AddStartupDialog } from "@/components/landing/add-startup-dialog";
+import { AutoGitHubSync } from "@/components/auto-github-sync";
 import { fetchTrustMrrStartup, type TrustMrrStartup } from "@/lib/providers/trustmrr";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
@@ -23,6 +24,11 @@ type ProviderConnectionRow = {
   config: unknown;
   user_id: string;
 };
+type PublicLeaderboardRow = {
+  commit_count: number;
+  startup_slug: string;
+  user_id: string;
+};
 type RepoRow = {
   id: string;
   user_id: string;
@@ -41,6 +47,7 @@ export default async function Home() {
 
   return (
     <main className="min-h-screen bg-[#f5f5f4] px-4 py-7 text-black">
+      <AutoGitHubSync enabled={Boolean(user)} />
       <section className="mx-auto flex min-h-screen w-full max-w-[760px] flex-col">
         <nav className="flex items-center justify-center">
           <Link href="/" className="font-mono text-sm font-black tracking-tight text-zinc-500">
@@ -63,8 +70,44 @@ export default async function Home() {
                 CommitMRR ranks founders by commits from selected GitHub repos.
               </p>
             </div>
-            <div className="overflow-x-auto">
-              <table className="w-full min-w-[640px] border-collapse font-mono text-[12px]">
+            <div className="space-y-0 border-t border-zinc-100 md:hidden">
+              {leaderboard.map((row) => (
+                <div key={`${row.rank}-${row.slug}`} className="border-b border-zinc-100 p-4 font-mono">
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="flex min-w-0 items-center gap-3">
+                      <span className="w-6 shrink-0 text-zinc-500">
+                        <RankBadge rank={row.rank} />
+                      </span>
+                      <span
+                        className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-zinc-900 bg-cover bg-center text-[10px] font-bold text-white"
+                        style={row.avatar.startsWith("http") ? { backgroundImage: `url(${row.avatar})` } : undefined}
+                      >
+                        {!row.avatar.startsWith("http") && row.avatar}
+                      </span>
+                      <span className="min-w-0">
+                        <span className="block truncate text-[12px] font-normal text-black">{row.founder}</span>
+                        <span className="block truncate text-[10px] text-zinc-500">{row.handle}</span>
+                      </span>
+                    </div>
+                    <span className="shrink-0 text-right text-[12px] font-black">{row.commits}</span>
+                  </div>
+                  <div className="mt-3 flex items-center justify-between gap-3 pl-9">
+                    <span className="inline-flex min-w-0 items-center gap-2 text-[12px] font-normal">
+                      <span
+                        className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md bg-zinc-100 bg-cover bg-center text-[10px] font-bold"
+                        style={row.startupIcon ? { backgroundImage: `url(${row.startupIcon})` } : undefined}
+                      >
+                        {!row.startupIcon && row.startup.slice(0, 1)}
+                      </span>
+                      <span className="truncate">{row.startup}</span>
+                    </span>
+                    <span className="shrink-0 text-[11px] text-zinc-500">{row.mrr}</span>
+                  </div>
+                </div>
+              ))}
+            </div>
+            <div className="hidden overflow-x-auto md:block">
+              <table className="w-full border-collapse font-mono text-[12px]">
                 <thead className="text-[10px] font-normal text-zinc-500">
                   <tr className="border-t border-zinc-100">
                     <th className="w-14 px-5 py-3 text-left font-normal">#</th>
@@ -76,7 +119,7 @@ export default async function Home() {
                 </thead>
                 <tbody>
                   {leaderboard.map((row) => (
-                    <tr key={row.rank} className="border-t border-zinc-100">
+                    <tr key={`${row.rank}-${row.slug}`} className="border-t border-zinc-100">
                       <td className="px-5 py-3 text-zinc-500">
                         <RankBadge rank={row.rank} />
                       </td>
@@ -160,6 +203,11 @@ function RankBadge({ rank }: { rank: string }) {
 }
 
 async function getLeaderboard(currentUserId?: string): Promise<LeaderboardRow[]> {
+  const publicRows = await getPublicLeaderboardRows();
+  if (publicRows.length) {
+    return publicRows;
+  }
+
   const admin = createSupabaseAdminClient();
 
   if (!admin) {
@@ -206,6 +254,33 @@ async function getLeaderboard(currentUserId?: string): Promise<LeaderboardRow[]>
         startup,
         0,
         commitsByUserId.get(connection.user_id) ?? 0,
+      );
+    }),
+  );
+
+  return rows
+    .filter((row): row is LeaderboardRow => Boolean(row))
+    .sort((a, b) => parseCommitTotal(b.commits) - parseCommitTotal(a.commits))
+    .map((row, index) => ({ ...row, rank: String(index + 1) }));
+}
+
+async function getPublicLeaderboardRows() {
+  const supabase = await createSupabaseServerClient();
+  const { data, error } = await supabase.rpc("get_public_leaderboard");
+
+  if (error || !data?.length) return [];
+
+  const rows = await Promise.all(
+    ((data ?? []) as PublicLeaderboardRow[]).map(async (row) => {
+      if (!row.startup_slug) return null;
+
+      const startup = await fetchTrustMrrStartup(row.startup_slug);
+      if (!startup) return null;
+
+      return startupToLeaderboardRow(
+        startup,
+        0,
+        Number(row.commit_count) || 0,
       );
     }),
   );

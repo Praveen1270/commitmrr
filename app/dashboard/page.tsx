@@ -1,6 +1,6 @@
 import { createShareReport } from "@/app/actions/reports";
 import { signOut } from "@/app/actions/auth";
-import { syncNow } from "@/app/actions/sync";
+import { AutoGitHubSync } from "@/components/auto-github-sync";
 import { CommitRevenueChart } from "@/components/charts/commit-revenue-chart";
 import { getDashboardData } from "@/lib/data/dashboard";
 import { formatMoneyFromMinor } from "@/lib/utils";
@@ -14,6 +14,7 @@ export default async function DashboardPage() {
 
   return (
     <main className="min-h-screen bg-slate-100 px-6 py-8 text-slate-950">
+      <AutoGitHubSync enabled={Boolean(dashboard.user)} />
       <div className="mx-auto max-w-7xl">
         <header className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
           <div>
@@ -22,9 +23,6 @@ export default async function DashboardPage() {
           </div>
           <div className="flex flex-wrap gap-3">
             <Link href="/onboarding" className="rounded-full border border-slate-300 px-4 py-2 text-sm font-semibold">Setup</Link>
-            <form action={syncNow}>
-              <button className="rounded-full bg-slate-950 px-4 py-2 text-sm font-semibold text-white">Sync GitHub</button>
-            </form>
             <form action={signOut}>
               <button className="rounded-full border border-slate-300 px-4 py-2 text-sm font-semibold">Sign out</button>
             </form>
