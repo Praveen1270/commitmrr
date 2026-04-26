@@ -46,7 +46,7 @@ export function AddStartupDialog({ isSignedIn }: { isSignedIn: boolean }) {
                   </p>
                   <p className="mt-2">
                     TrustMRR adds the verified startup record. You can disable a startup or turn repos off anytime from
-                    setup.
+                    the dashboard.
                   </p>
                 </div>
               </div>

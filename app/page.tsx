@@ -13,6 +13,7 @@ type LeaderboardRow = {
   startupIcon: string;
   slug: string;
   commits: string;
+  last30DaysRevenue: string;
   mrr: string;
   avatar: string;
 };
@@ -25,7 +26,10 @@ type ProviderConnectionRow = {
   user_id: string;
 };
 type PublicLeaderboardRow = {
+  all_time_revenue?: string | null;
   commit_count: number;
+  last_30_days_revenue?: string | null;
+  mrr?: string | null;
   startup_slug: string;
   user_id: string;
 };
@@ -67,90 +71,58 @@ export default async function Home() {
             <div className="px-5 py-4">
               <h2 className="font-mono text-[15px] font-normal text-black">Leaderboard</h2>
               <p className="mt-1 font-mono text-[11px] text-zinc-500">
-                CommitMRR ranks founders by commits from selected GitHub repos.
+                CommitMRR ranks founders by all-time commits from selected GitHub repos.
               </p>
             </div>
-            <div className="space-y-0 border-t border-zinc-100 md:hidden">
-              {leaderboard.map((row) => (
-                <div key={`${row.rank}-${row.slug}`} className="border-b border-zinc-100 p-4 font-mono">
-                  <div className="flex items-start justify-between gap-3">
-                    <div className="flex min-w-0 items-center gap-3">
-                      <span className="w-6 shrink-0 text-zinc-500">
-                        <RankBadge rank={row.rank} />
-                      </span>
-                      <span
-                        className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-zinc-900 bg-cover bg-center text-[10px] font-bold text-white"
-                        style={row.avatar.startsWith("http") ? { backgroundImage: `url(${row.avatar})` } : undefined}
-                      >
-                        {!row.avatar.startsWith("http") && row.avatar}
-                      </span>
-                      <span className="min-w-0">
-                        <span className="block truncate text-[12px] font-normal text-black">{row.founder}</span>
-                        <span className="block truncate text-[10px] text-zinc-500">{row.handle}</span>
-                      </span>
-                    </div>
-                    <span className="shrink-0 text-right text-[12px] font-black">{row.commits}</span>
-                  </div>
-                  <div className="mt-3 flex items-center justify-between gap-3 pl-9">
-                    <span className="inline-flex min-w-0 items-center gap-2 text-[12px] font-normal">
-                      <span
-                        className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md bg-zinc-100 bg-cover bg-center text-[10px] font-bold"
-                        style={row.startupIcon ? { backgroundImage: `url(${row.startupIcon})` } : undefined}
-                      >
-                        {!row.startupIcon && row.startup.slice(0, 1)}
-                      </span>
-                      <span className="truncate">{row.startup}</span>
-                    </span>
-                    <span className="shrink-0 text-[11px] text-zinc-500">{row.mrr}</span>
-                  </div>
-                </div>
-              ))}
-            </div>
-            <div className="hidden overflow-x-auto md:block">
-              <table className="w-full border-collapse font-mono text-[12px]">
+            <div>
+              <table className="w-full border-collapse font-mono text-[11px]">
                 <thead className="text-[10px] font-normal text-zinc-500">
                   <tr className="border-t border-zinc-100">
-                    <th className="w-14 px-5 py-3 text-left font-normal">#</th>
-                    <th className="px-4 py-3 text-left font-normal">Founder</th>
-                    <th className="px-4 py-3 text-left font-normal">Startup</th>
-                    <th className="px-4 py-3 text-right font-normal">Commits</th>
-                    <th className="px-5 py-3 text-right font-normal">MRR</th>
+                    <th className="w-10 px-3 py-3 text-left font-normal">#</th>
+                    <th className="px-2 py-3 text-left font-normal">Founder</th>
+                    <th className="px-2 py-3 text-left font-normal">Startup</th>
+                    <th className="px-2 py-3 text-right font-normal">Commits</th>
+                    <th className="px-2 py-3 text-right font-normal">MRR</th>
+                    <th className="px-3 py-3 text-right font-normal">Last 30 days</th>
                   </tr>
                 </thead>
                 <tbody>
                   {leaderboard.map((row) => (
                     <tr key={`${row.rank}-${row.slug}`} className="border-t border-zinc-100">
-                      <td className="px-5 py-3 text-zinc-500">
+                      <td className="px-3 py-3 text-zinc-500">
                         <RankBadge rank={row.rank} />
                       </td>
-                      <td className="px-4 py-3">
-                        <div className="flex items-center gap-3">
+                      <td className="px-2 py-3">
+                        <div className="flex items-center gap-2">
                           <span
-                            className="flex h-8 w-8 items-center justify-center rounded-full bg-zinc-900 bg-cover bg-center text-[10px] font-bold text-white"
+                            className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-zinc-900 bg-cover bg-center text-[10px] font-bold text-white"
                             style={row.avatar.startsWith("http") ? { backgroundImage: `url(${row.avatar})` } : undefined}
                           >
                             {!row.avatar.startsWith("http") && row.avatar}
                           </span>
-                          <span>
-                            <span className="block font-normal text-black">{row.founder}</span>
-                            <span className="text-[10px] text-zinc-500">{row.handle}</span>
+                          <span className="min-w-0">
+                            <span className="block truncate font-normal text-black">{row.founder}</span>
+                            <span className="block truncate text-[10px] text-zinc-500">{row.handle}</span>
                           </span>
                         </div>
                       </td>
-                      <td className="px-4 py-3">
+                      <td className="px-2 py-3">
                         <span className="inline-flex items-center gap-2 font-normal">
                           <span
-                            className="flex h-6 w-6 items-center justify-center rounded-md bg-zinc-100 bg-cover bg-center text-[10px] font-bold"
+                            className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md bg-zinc-100 bg-cover bg-center text-[10px] font-bold"
                             style={row.startupIcon ? { backgroundImage: `url(${row.startupIcon})` } : undefined}
                           >
                             {!row.startupIcon && row.startup.slice(0, 1)}
                           </span>
-                          <span>{row.startup}</span>
+                          <span className="truncate">{row.startup}</span>
                         </span>
                       </td>
-                      <td className="px-4 py-3 text-right font-black">{row.commits}</td>
-                      <td className="px-5 py-3 text-right">
+                      <td className="px-2 py-3 text-right font-black">{row.commits}</td>
+                      <td className="px-2 py-3 text-right">
                         <span className="block text-zinc-500">{row.mrr}</span>
+                      </td>
+                      <td className="px-3 py-3 text-right">
+                        <span className="block text-zinc-500">{row.last30DaysRevenue}</span>
                       </td>
                     </tr>
                   ))}
@@ -159,28 +131,9 @@ export default async function Home() {
             </div>
           </div>
 
-          <div className="grid w-full gap-4 py-8 text-left sm:grid-cols-3" suppressHydrationWarning>
-            {[
-              ["1", "Connect GitHub", "We count daily commits from the repos you choose."],
-              ["2", "Select repos", "Only selected GitHub repos count toward your CommitMRR rank."],
-              ["3", "Select TrustMRR", "Choose the matching startup from the TrustMRR result list."],
-            ].map(([step, title, copy]) => (
-              <div
-                key={step}
-                className="rounded-[10px] border border-zinc-200 bg-white p-4 shadow-sm"
-                suppressHydrationWarning
-              >
-                <span className="inline-flex h-6 w-6 items-center justify-center rounded-full bg-black font-mono text-[11px] font-black text-white">
-                  {step}
-                </span>
-                <h3 className="mt-3 font-mono text-sm font-black">{title}</h3>
-                <p className="mt-2 font-mono text-[11px] leading-5 text-zinc-500">{copy}</p>
-              </div>
-            ))}
-          </div>
           {!leaderboard.length && (
             <div
-              className="mb-8 w-full rounded-[10px] border border-dashed border-zinc-300 bg-white p-5 text-center font-mono text-sm text-zinc-500"
+              className="my-8 w-full rounded-[10px] border border-dashed border-zinc-300 bg-white p-5 text-center font-mono text-sm text-zinc-500"
               suppressHydrationWarning
             >
               Connect GitHub, select a repo, then choose your TrustMRR startup from the list to appear here.
@@ -250,11 +203,7 @@ async function getLeaderboard(currentUserId?: string): Promise<LeaderboardRow[]>
       const startup = await fetchTrustMrrStartup(selectedStartup.slug);
       if (!startup) return null;
 
-      return startupToLeaderboardRow(
-        startup,
-        0,
-        commitsByUserId.get(connection.user_id) ?? 0,
-      );
+      return startupToLeaderboardRow(startup, 0, commitsByUserId.get(connection.user_id) ?? 0);
     }),
   );
 
@@ -277,11 +226,7 @@ async function getPublicLeaderboardRows() {
       const startup = await fetchTrustMrrStartup(row.startup_slug);
       if (!startup) return null;
 
-      return startupToLeaderboardRow(
-        startup,
-        0,
-        Number(row.commit_count) || 0,
-      );
+      return startupToLeaderboardRow(startup, 0, Number(row.commit_count) || 0);
     }),
   );
 
@@ -355,9 +300,14 @@ function startupToLeaderboardRow(
     startupIcon: startup.icon,
     slug: startup.slug,
     commits: commitTotal === null ? "connect" : commitTotal.toLocaleString(),
-    mrr: startup.monthlyMrr,
+    mrr: firstDisplayMoney(startup.monthlyMrr, startup.mrr),
+    last30DaysRevenue: firstDisplayMoney(startup.last30DaysRevenue),
     avatar: twitterAvatar(startup) || initials(startup.founder || startup.name),
   };
+}
+
+function firstDisplayMoney(...values: Array<string | undefined>) {
+  return values.find((value) => value && value.trim() && value.trim() !== "$0") ?? "$0";
 }
 
 function founderMeta(startup: TrustMrrStartup) {

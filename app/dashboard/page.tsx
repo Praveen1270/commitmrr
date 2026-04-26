@@ -22,7 +22,7 @@ export default async function DashboardPage() {
             <h1 className="mt-1 text-4xl font-semibold tracking-tight">Does building move revenue?</h1>
           </div>
           <div className="flex flex-wrap gap-3">
-            <Link href="/onboarding" className="rounded-full border border-slate-300 px-4 py-2 text-sm font-semibold">Setup</Link>
+            <Link href="/onboarding" className="rounded-full border border-slate-300 px-4 py-2 text-sm font-semibold">Dashboard</Link>
             <form action={signOut}>
               <button className="rounded-full border border-slate-300 px-4 py-2 text-sm font-semibold">Sign out</button>
             </form>

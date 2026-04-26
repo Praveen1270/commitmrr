@@ -15,6 +15,7 @@ type StartupSelection = {
   founder?: string;
   mrr?: string;
   mrrMinor?: number;
+  last30DaysRevenue?: string;
   revenueLabel?: string;
   growth?: string;
   slug?: string;
@@ -59,14 +60,16 @@ export default async function OnboardingPage({
   const hasSelectedRepo = selectedRepoCount > 0;
   const startup = hasSelectedRepo && slugQuery ? await searchTrustMrrStartup(slugQuery) : null;
   const startups = startup ? [startup] : [];
-  const repoRows = ((repos ?? []) as RepoRow[]).filter((repo) =>
-    repoQuery ? repo.full_name.toLowerCase().includes(repoQuery.toLowerCase()) : true,
-  );
+  const repoRows = repoQuery
+    ? ((repos ?? []) as RepoRow[]).filter((repo) =>
+      repo.full_name.toLowerCase().includes(repoQuery.toLowerCase()),
+    )
+    : [];
 
   return (
     <main className="min-h-screen bg-[#f5f5f4] px-6 py-10 text-black" suppressHydrationWarning>
       <div className="mx-auto max-w-4xl" suppressHydrationWarning>
-        <p className="font-mono text-sm font-black text-zinc-500">CommitMRR setup</p>
+        <p className="font-mono text-sm font-black text-zinc-500">CommitMRR dashboard</p>
         <h1 className="mt-2 max-w-2xl font-mono text-4xl font-black tracking-[-0.055em]">
           Connect GitHub. Add your startup.
         </h1>
@@ -144,7 +147,12 @@ export default async function OnboardingPage({
                 </form>
               ))}
               {!repos?.length && <p className="font-mono text-sm text-zinc-500">No repositories imported yet.</p>}
-              {!!repos?.length && !repoRows.length && (
+              {!!repos?.length && !repoQuery && (
+                <p className="rounded-[10px] border border-dashed border-zinc-300 p-4 font-mono text-sm leading-6 text-zinc-500">
+                  Search repositories to choose which repos count.
+                </p>
+              )}
+              {!!repos?.length && repoQuery && !repoRows.length && (
                 <p className="font-mono text-sm text-zinc-500">
                   No repositories match <span className="font-black">{repoQuery}</span>.
                 </p>
@@ -208,7 +216,7 @@ export default async function OnboardingPage({
         </div>
 
         <section className="mt-5 rounded-[14px] border border-zinc-200 bg-white p-6 shadow-sm" suppressHydrationWarning>
-          <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between" suppressHydrationWarning>
+          <div suppressHydrationWarning>
             <div suppressHydrationWarning>
               <h2 className="font-mono text-xl font-black">Add TrustMRR startup</h2>
               <p className="mt-2 font-mono text-sm leading-6 text-zinc-500">
@@ -221,13 +229,6 @@ export default async function OnboardingPage({
                 </p>
               )}
             </div>
-            <span className="rounded-full bg-zinc-100 px-3 py-1 font-mono text-xs text-zinc-500">
-              {hasSelectedRepo
-                ? slugQuery
-                  ? `${startups.length} result`
-                  : "slug lookup"
-                : "repo required"}
-            </span>
           </div>
 
           <form className="mt-5 flex flex-col gap-3 sm:flex-row">
@@ -235,7 +236,7 @@ export default async function OnboardingPage({
               name="slug"
               defaultValue={slugQuery}
               disabled={!hasSelectedRepo}
-              placeholder="shipfast or https://trustmrr.com/startup/shipfast"
+              placeholder="Search TrustMRR startup"
               className="min-h-12 flex-1 rounded-[10px] border border-zinc-200 bg-zinc-50 px-4 font-mono text-sm outline-none focus:border-black disabled:cursor-not-allowed disabled:text-zinc-400"
             />
             <button
@@ -245,11 +246,6 @@ export default async function OnboardingPage({
               {hasSelectedRepo ? "Get startup" : "Select repo first"}
             </button>
           </form>
-          <p className="mt-3 font-mono text-xs leading-5 text-zinc-500">
-            {hasSelectedRepo
-              ? "Use the startup slug from a TrustMRR URL, for example `shipfast`."
-              : "Select at least one GitHub repo before adding a TrustMRR startup."}
-          </p>
 
           <div className="mt-5 grid gap-3 md:grid-cols-2" suppressHydrationWarning>
             {startups.map((startup) => {
@@ -268,6 +264,7 @@ export default async function OnboardingPage({
                   <input type="hidden" name="founder" value={startup.founder} />
                   <input type="hidden" name="mrr" value={startup.mrr} />
                   <input type="hidden" name="mrrMinor" value={startup.mrrMinor} />
+                  <input type="hidden" name="last30DaysRevenue" value={startup.last30DaysRevenue} />
                   <input type="hidden" name="revenueLabel" value={startup.revenueLabel} />
                   <input type="hidden" name="growth" value={startup.growth} />
                   <input type="hidden" name="category" value={startup.category} />
@@ -298,12 +295,12 @@ export default async function OnboardingPage({
 
                     <div className="mt-4 grid grid-cols-2 gap-2 text-xs">
                       <div className="rounded-[10px] bg-zinc-100 p-3">
-                        <p className="text-zinc-500">{startup.revenueLabel}</p>
+                        <p className="text-zinc-500">MRR</p>
                         <p className="mt-1 font-black">{startup.mrr}</p>
                       </div>
                       <div className="rounded-[10px] bg-zinc-100 p-3">
-                        <p className="text-zinc-500">Growth</p>
-                        <p className="mt-1 font-black">{startup.growth}</p>
+                        <p className="text-zinc-500">Last 30 days</p>
+                        <p className="mt-1 font-black">{startup.last30DaysRevenue}</p>
                       </div>
                     </div>
 
@@ -328,13 +325,6 @@ export default async function OnboardingPage({
                 </form>
               );
             })}
-
-            {!slugQuery && hasSelectedRepo && (
-              <div className="rounded-[12px] border border-dashed border-zinc-300 p-6 font-mono text-sm leading-6 text-zinc-500 md:col-span-2" suppressHydrationWarning>
-                Paste your TrustMRR startup slug or URL to fetch the verified
-                revenue record.
-              </div>
-            )}
 
             {!hasSelectedRepo && (
               <div className="rounded-[12px] border border-dashed border-zinc-300 p-6 font-mono text-sm leading-6 text-zinc-500 md:col-span-2" suppressHydrationWarning>
