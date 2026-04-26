@@ -6,4 +6,5 @@ import { revalidatePath } from "next/cache";
 export async function syncNow() {
   await runManualSync();
   revalidatePath("/dashboard");
+  revalidatePath("/");
 }

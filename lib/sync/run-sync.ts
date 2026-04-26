@@ -1,8 +1,6 @@
 import { buildInsightSummary, type DailyJoinedMetric } from "@/lib/analytics/metrics";
-import { decryptSecret } from "@/lib/security/crypto";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { daysAgo, toDateKey } from "@/lib/utils";
-import { fetchDailyDodoRevenue } from "@/lib/providers/dodo";
 import { fetchDailyCommitCounts } from "@/lib/providers/github";
 
 type RepoRow = {
@@ -45,40 +43,29 @@ export async function runManualSync() {
   if (reposError) throw reposError;
   if (!repos?.length) throw new Error("Choose at least one repository before syncing.");
 
-  const { data: dodoConnection, error: dodoError } = await supabase
+  const { data: githubConnection, error: githubConnectionError } = await supabase
     .from("provider_connections")
-    .select("id, encrypted_secret, mode")
+    .select("id")
     .eq("user_id", user.id)
-    .eq("provider", "dodo")
+    .eq("provider", "github")
     .single();
 
-  if (dodoError) throw dodoError;
-  if (!dodoConnection.encrypted_secret) {
-    throw new Error("Add a DodoPayments API key before syncing revenue.");
-  }
+  if (githubConnectionError) throw githubConnectionError;
 
   const from = daysAgo(60);
   const to = new Date();
   const repoRows = repos as RepoRow[];
 
-  const [commitMetrics, revenueMetrics] = await Promise.all([
-    fetchDailyCommitCounts({
-      token: githubToken,
-      repositories: repoRows.map((repo) => ({
-        owner: repo.owner,
-        name: repo.name,
-        fullName: repo.full_name,
-      })),
-      from,
-      to,
-    }),
-    fetchDailyDodoRevenue({
-      apiKey: decryptSecret(dodoConnection.encrypted_secret),
-      from,
-      to,
-      mode: dodoConnection.mode === "live" ? "live" : "test",
-    }),
-  ]);
+  const commitMetrics = await fetchDailyCommitCounts({
+    token: githubToken,
+    repositories: repoRows.map((repo) => ({
+      owner: repo.owner,
+      name: repo.name,
+      fullName: repo.full_name,
+    })),
+    from,
+    to,
+  });
 
   const repoByFullName = new Map(repoRows.map((repo) => [repo.full_name, repo]));
   const commitUpserts = commitMetrics.flatMap((metric) => {
@@ -100,23 +87,6 @@ export async function runManualSync() {
     if (error) throw error;
   }
 
-  if (revenueMetrics.length) {
-    const { error } = await supabase.from("daily_revenue_metrics").upsert(
-      revenueMetrics.map((metric) => ({
-        user_id: user.id,
-        provider: "dodo",
-        metric_date: metric.date,
-        currency: metric.currency,
-        gross_amount_minor: metric.grossAmountMinor,
-        net_amount_minor: metric.netAmountMinor,
-        payment_count: metric.paymentCount,
-        updated_at: new Date().toISOString(),
-      })),
-      { onConflict: "user_id,provider,metric_date,currency" },
-    );
-    if (error) throw error;
-  }
-
   const joinedMetrics = await loadJoinedMetrics(user.id, toDateKey(from), toDateKey(to));
   const insight = buildInsightSummary(joinedMetrics);
 
@@ -130,11 +100,11 @@ export async function runManualSync() {
   await supabase
     .from("provider_connections")
     .update({ last_synced_at: new Date().toISOString() })
-    .eq("id", dodoConnection.id);
+    .eq("id", githubConnection.id);
 
   return {
     commitDays: commitMetrics.length,
-    revenueDays: revenueMetrics.length,
+    revenueDays: joinedMetrics.filter((metric) => metric.revenueMinor > 0).length,
     insight,
   };
 }

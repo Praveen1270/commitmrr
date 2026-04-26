@@ -119,6 +119,7 @@ export async function selectTrustMrrStartup(formData: FormData) {
     userId: user.id,
     selectedStartup,
   });
+  revalidatePath("/");
   revalidatePath("/onboarding");
   revalidatePath("/dashboard");
   redirect("/onboarding");
@@ -194,6 +195,7 @@ export async function toggleGitHubRepository(formData: FormData) {
     .eq("user_id", user.id);
 
   if (error) throw error;
+  revalidatePath("/");
   revalidatePath("/onboarding");
 }
 

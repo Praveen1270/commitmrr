@@ -1,5 +1,6 @@
 import { AddStartupDialog } from "@/components/landing/add-startup-dialog";
 import { fetchTrustMrrStartup, type TrustMrrStartup } from "@/lib/providers/trustmrr";
+import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import Link from "next/link";
 
@@ -18,6 +19,14 @@ type ConnectedStartup = {
   row: LeaderboardRow;
 };
 type CommitRow = { metric_date: string; commit_count: number };
+type ProviderConnectionRow = {
+  config: unknown;
+  user_id: string;
+};
+type RepoRow = {
+  id: string;
+  user_id: string;
+};
 
 const topRankLabels: Record<string, string> = {
   "1": "🥇",
@@ -28,8 +37,7 @@ const topRankLabels: Record<string, string> = {
 export default async function Home() {
   const supabase = await createSupabaseServerClient();
   const { data: { user } } = await supabase.auth.getUser();
-  const connectedStartup = user ? await getConnectedStartup(user.id) : null;
-  const leaderboard = connectedStartup ? [connectedStartup.row] : [];
+  const leaderboard = await getLeaderboard(user?.id);
 
   return (
     <main className="min-h-screen bg-[#f5f5f4] px-4 py-7 text-black">
@@ -151,7 +159,64 @@ function RankBadge({ rank }: { rank: string }) {
   return <span className="text-base leading-none">{label}</span>;
 }
 
-async function getConnectedStartup(userId: string): Promise<ConnectedStartup | null> {
+async function getLeaderboard(currentUserId?: string): Promise<LeaderboardRow[]> {
+  const admin = createSupabaseAdminClient();
+
+  if (!admin) {
+    const connectedStartup = currentUserId ? await getCurrentUserStartup(currentUserId) : null;
+    return connectedStartup ? [connectedStartup.row] : [];
+  }
+
+  const [{ data: connections }, { data: repos }] = await Promise.all([
+    admin
+      .from("provider_connections")
+      .select("user_id, config")
+      .eq("provider", "github"),
+    admin
+      .from("github_repositories")
+      .select("id, user_id")
+      .eq("is_tracked", true),
+  ]);
+  const repoRows = (repos ?? []) as RepoRow[];
+  const repoIds = repoRows.map((repo) => repo.id);
+  const { data: commits } = repoIds.length
+    ? await admin
+      .from("daily_commit_metrics")
+      .select("repository_id, commit_count")
+      .in("repository_id", repoIds)
+    : { data: [] };
+
+  const userIdByRepoId = new Map(repoRows.map((repo) => [repo.id, repo.user_id]));
+  const commitsByUserId = new Map<string, number>();
+  for (const row of (commits ?? []) as { repository_id: string; commit_count: number }[]) {
+    const userId = userIdByRepoId.get(row.repository_id);
+    if (!userId) continue;
+    commitsByUserId.set(userId, (commitsByUserId.get(userId) ?? 0) + row.commit_count);
+  }
+
+  const rows = await Promise.all(
+    ((connections ?? []) as ProviderConnectionRow[]).map(async (connection) => {
+      const selectedStartup = getSelectedStartup(connection.config);
+      if (!selectedStartup?.slug) return null;
+
+      const startup = await fetchTrustMrrStartup(selectedStartup.slug);
+      if (!startup) return null;
+
+      return startupToLeaderboardRow(
+        startup,
+        0,
+        commitsByUserId.get(connection.user_id) ?? 0,
+      );
+    }),
+  );
+
+  return rows
+    .filter((row): row is LeaderboardRow => Boolean(row))
+    .sort((a, b) => parseCommitTotal(b.commits) - parseCommitTotal(a.commits))
+    .map((row, index) => ({ ...row, rank: String(index + 1) }));
+}
+
+async function getCurrentUserStartup(userId: string): Promise<ConnectedStartup | null> {
   const supabase = await createSupabaseServerClient();
   const [{ data: repos }, { data: connection }] = await Promise.all([
     supabase
@@ -185,6 +250,10 @@ async function getConnectedStartup(userId: string): Promise<ConnectedStartup | n
   return {
     row: startupToLeaderboardRow(startup, 0, totalCommits),
   };
+}
+
+function parseCommitTotal(value: string) {
+  return Number(value.replace(/[^\d]/g, "")) || 0;
 }
 
 function getSelectedStartup(config: unknown) {
